@@ -22,8 +22,10 @@ Y = np.array(Y_train)
 myNet = neural_network(layersizes = [4, 128, 64, 3],
                        activations = ['relu', 'relu', 'softmax'],
                        learning_rate=0.001,
-                       losses='crossentropy')
-myNet.train_network(X, Y, 20, 1000)
+                       losses='crossentropy',
+                       training_epochs=2000,
+                       steps_per_epoch=None)
+myNet.train_network(X, Y)
 
 # Test Predictions
 X = np.array(X_test)
