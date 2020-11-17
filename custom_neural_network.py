@@ -1,9 +1,6 @@
 # Standard Imports
 import numpy as np
 
-# Custom Imports
-from diagnostics import network_diagnostics
-
 # Neural Network Class for Feature Approximation in Reinforcement Learning
 class neural_network():
 
