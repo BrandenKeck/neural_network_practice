@@ -1,91 +1,132 @@
 import numpy as np
 import tensorflow as tf
 
-# Tensors are the basic data structure in TensorFlow which store data in any number of dimensions, similar to multi dimensional arrays in NumPy.
-#   Constants - nodes without input (immutable),
-#   Variables - mutable nodes,
-#   or Placeholders - "promise" that value will be assigned (used for inputs)
+# INTRODUCTION ----
 
+def run_introduction():
+    # Typing in Tensorflow:
+    string = tf.Variable("this is a string", tf.string)
+    number = tf.Variable(324, tf.int16)
+    floating = tf.Variable(3.567, tf.float64)
 
-# The most basic code possible:
-## --
-## Define a variable
-#a = tf.Variable(2.0, name='a')
-## Define a constant
-#b = tf.constant([1., 2., 3., 4.], name='b')
-## Combine tensors to create a new tensor
-#c = (a + 1)*b
-## --
+    # We can make things multidimensional:
+    rank1_tensor = tf.Variable(["Test"], tf.string)
+    rank2_tensor = tf.Variable([["test", "ok"], ["test", "yes"]], tf.string)
+    print(tf.rank(rank2_tensor))
+    print(rank2_tensor.shape)
 
-# Working with Arrays:
-## --
-## Let's do this exercise again with more array operations:
-#b = tf.Variable(np.arange(0, 10), name='b')
-#c = tf.Variable(1.0, name='c')
-## To add, we need to convert b to float (since the original values cast to int32)
-#d = tf.cast(b, tf.float32) + c
-## --
+    # We can re-shape the multidimensional
+    tensor1 = tf.ones([1,2,3])
+    tensor2 = tf.reshape(tensor1, [2,3,1])
+    tensor3 = tf.reshape(tensor2, [3, -1])
 
-# Lets get into some neural networks
-## --
-## Nab a dataset
-## Note on the data dimensions:
-##  x_train: (60,000 x 28 x 28)
-##  y_train: (60,000)
-##  x_test: (10,000 x 28 x 28)
-##  y_test: (10,000)
-## Note: x_data is scaled to be [0, 1]
-from tensorflow.keras.datasets import mnist
-(x_train, y_train), (x_test, y_test) = mnist.load_data()
-x_train = x_train / 255.0
-x_test = x_test / 255.0
-x_train = tf.Variable(x_train)
-x_test = tf.Variable(x_test)
-## Create a function for batch extraction of training data:
-def get_batch(x_data, y_data, batch_size):
-    idxs = np.random.randint(0, len(y_data), batch_size)
-    print(x_data[idxs.to_list(),:,:])
-    print(y_data[idxs])
-    return x_data[idxs,:,:], y_data[idxs]
-## Setup simulation parameters:
-epochs = 10
-batch_size = 100
-## Create weights and biases based on a static, one-hidden-layer structure
-## Note that the input is 28 x 28 = 784
-W1 = tf.Variable(tf.random.normal([784, 300], stddev=0.03), name='W1')
-b1 = tf.Variable(tf.random.normal([300]), name='b1')
-W2 = tf.Variable(tf.random.normal([300, 10], stddev=0.03), name='W2')
-b2 = tf.Variable(tf.random.normal([10]), name='b2')
-## Having initialized our arrays, create a neural network function with tf operations as follows:
-def nn_model(x_input, W1, b1, W2, b2):
-    x_input = tf.reshape(x_input, (x_input.shape[0], -1)) # Flatten
-    x = tf.add(tf.matmul(tf.cast(x_input, tf.float32), W1), b1) #Layer 1
-    x = tf.nn.relu(x) # Activate Layer 1
-    logits = tf.add(tf.matmul(x, W2), b2) # Layer 2
-    return logits # Return unactivated output because the logit is needed for the loss function
-## Having created a model, setup a loss function as follows:
-def loss_fn(logits, labels):
-    cross_entropy = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(labels=labels,                                                          logits=logits))
-    return cross_entropy
-## Finally Define the Optimizer:
-optimizer = tf.keras.optimizers.Adam()
-## Train the network (copy and paste code):
-total_batch = int(len(y_train) / batch_size)
-for epoch in range(epochs):
-    avg_loss = 0
-    for i in range(total_batch):
-        batch_x, batch_y = get_batch(x_train, y_train, batch_size=batch_size)
-        batch_x = tf.Variable(batch_x)
-        batch_y = tf.Variable(batch_y)
-        batch_y = tf.one_hot(batch_y, 10)
-        with tf.GradientTape() as tape:
-            logits = nn_model(batch_x, W1, b1, W2, b2)
-            loss = loss_fn(logits, batch_y)
-        gradients = tape.gradient(loss, [W1, b1, W2, b2])
-        optimizer.apply_gradients(zip(gradients, [W1, b1, W2, b2]))
-        avg_loss += loss / total_batch
-    test_logits = nn_model(x_test, W1, b1, W2, b2)
-    max_idxs = tf.argmax(test_logits, axis=1)
-    test_acc = np.sum(max_idxs.numpy() == y_test) / len(y_test)
-    print(f"Epoch: {epoch + 1}, loss={avg_loss:.3f}, test set      accuracy={test_acc*100:.3f}%")
-print("\nTraining complete!")
+# LINEAR REGRESSION  ----
+
+def run_linear_regression():
+    # Get a dataset
+    import pandas as pd
+    X_train = pd.read_csv('https://storage.googleapis.com/tf-datasets/titanic/train.csv')
+    X_test = pd.read_csv('https://storage.googleapis.com/tf-datasets/titanic/eval.csv')
+    Y_train = X_train.pop('survived')
+    Y_test = X_test.pop('survived')
+
+    # Data massaging...
+    categorical = ['sex', 'n_siblings_spouses', 'parch', 'class', 'deck', 'embark_town', 'alone']
+    numeric = ['age', 'fare']
+    feature_columns = []
+    for feature_name in categorical:
+      vocabulary = X_train[feature_name].unique()  # gets a list of all unique values from given feature column
+      feature_columns.append(tf.feature_column.categorical_column_with_vocabulary_list(feature_name, vocabulary))
+    for feature_name in numeric:
+      feature_columns.append(tf.feature_column.numeric_column(feature_name, dtype=tf.float32))
+
+    # The TensorFlow model we are going to use requires that the data we pass it comes in as a tf.data.Dataset object.
+    # This means we must create a input function that can convert our current pandas dataframe into that object.
+    def make_input_fn(data_df, label_df, num_epochs=10, shuffle=True, batch_size=32):
+      def input_function():
+        ds = tf.data.Dataset.from_tensor_slices((dict(data_df), label_df))
+        if shuffle:
+          ds = ds.shuffle(1000)
+        ds = ds.batch(batch_size).repeat(num_epochs)
+        return ds
+      return input_function
+    training_func = make_input_fn(X_train, Y_train)
+    testing_func = make_input_fn(X_test, Y_test, num_epochs=1, shuffle=False)
+
+    # Use a linear estimator to utilize the linear regression algorithm.
+    linear_est = tf.estimator.LinearClassifier(feature_columns=feature_columns)
+
+    # Make some predictions
+    pred_dicts = list(linear_est.predict(testing_func))
+
+    # Training call
+    linear_est.train(training_func)
+    result = linear_est.evaluate(testing_func)
+    print(result['accuracy'])  # Print
+
+# CLASSIFICATION ----
+
+def run_classification_example():
+
+    # Data stuff
+    import pandas as pd
+    CSV_COLUMN_NAMES = ['SepalLength', 'SepalWidth', 'PetalLength', 'PetalWidth', 'Species']
+    SPECIES = ['Setosa', 'Versicolor', 'Virginica']
+    train_path = tf.keras.utils.get_file("iris_training.csv", "https://storage.googleapis.com/download.tensorflow.org/data/iris_training.csv")
+    test_path = tf.keras.utils.get_file("iris_test.csv", "https://storage.googleapis.com/download.tensorflow.org/data/iris_test.csv")
+    X_train = pd.read_csv(train_path, names=CSV_COLUMN_NAMES, header=0)
+    X_test = pd.read_csv(test_path, names=CSV_COLUMN_NAMES, header=0)
+    Y_train = X_train.pop('Species')
+    Y_test = X_test.pop('Species')
+
+    # Data massaging...
+    # Feature columns describe how to use the input.
+    feature_columns = []
+    for key in X_train.keys():
+        feature_columns.append(tf.feature_column.numeric_column(key=key))
+
+    # The TensorFlow model we are going to use requires that the data we pass it comes in as a tf.data.Dataset object.
+    # This means we must create a input function that can convert our current pandas dataframe into that object.
+    def input_fn(features, labels, training=True, batch_size=256):
+        dataset = tf.data.Dataset.from_tensor_slices((dict(features), labels))
+        if training:
+            dataset = dataset.shuffle(1000).repeat()
+        return dataset.batch(batch_size)
+
+    # Build a DNN with 2 hidden layers with 30 and 10 hidden nodes each.
+    classifier = tf.estimator.DNNClassifier(
+        feature_columns=feature_columns,
+        hidden_units=[30, 10],
+        n_classes=3
+    )
+
+    # Training call
+    # We include a lambda to avoid creating an inner function previously
+    classifier.train(
+        input_fn=lambda: input_fn(X_train, Y_train, training=True),
+        steps=5000
+    )
+
+    # Make some predictions
+    eval_result = classifier.evaluate(
+        input_fn=lambda: input_fn(X_test, Y_test, training=False)
+    )
+    print('\nTest set accuracy: {accuracy:0.3f}\n'.format(**eval_result))
+
+    # Convert the inputs to a Dataset without labels.
+    def predict_input_fn(features, batch_size=256):
+        return tf.data.Dataset.from_tensor_slices(dict(features)).batch(batch_size)
+
+    # Make a prediction
+    predict = X_test.sample()
+    predictions = classifier.predict(input_fn=lambda: predict_input_fn(predict))
+    for pred_dict in predictions:
+        class_id = pred_dict['class_ids'][0]
+        probability = pred_dict['probabilities'][class_id]
+
+        print('Prediction is "{}" ({:.1f}%)'.format(
+            SPECIES[class_id], 100 * probability))
+
+#run_introduction()
+#run_linear_regression()
+#run_classification_example()
