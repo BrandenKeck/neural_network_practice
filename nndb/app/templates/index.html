@@ -1,0 +1,45 @@
+<!-- Base Meta Information -->
+<!doctype html>
+<html lang="en">
+
+<!-- Head info -->
+<head>
+  <title>Kril - Model Database</title>
+  <link rel="icon" type="image/jpg" href="{{ url_for('static', filename='img/janssen_ico.jpg') }}" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/bootstrap.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/animate.min.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/global_styles.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/font_styles.css') }}" />
+</head>
+
+<!-- Create Body -->
+<body>
+
+  <img src="{{url_for('static', filename='img/background0.jpg')}}" class="bg-img" />
+
+  <div class="container-fluid">
+
+    HELLO WORLD
+
+  </div>
+
+  <script src="{{ url_for('static', filename='js/bootstrap.bundle.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/jquery.min.js') }}" integrity="sha256-/xUj+3OJU5yExlq6GSYGSHk7tPXikynS7ogEvDej/m4=" crossorigin="anonymous"></script>
+  <script src="{{ url_for('static', filename='js/fontawesome.min.js') }}" crossorigin="anonymous"></script>
+  <script src="{{ url_for('static', filename='js/plotly.min.js') }}"></script>
+  <script src="{{ url_for('static', filename='js/global_scripts.js') }}"></script>
+
+</body>
+
+</html>
+
+
+<!--
+
+The purpose of this dashboard is to manage DPD project metadata and persist that data to facilitate team discussion and decision-making.
+The home tab contains a basic overview of the system.
+The metrics tab acts as a visualization tool, which tracks project metrics as they are updated by the team.
+Projects can be viewed, updated, or created from the Projects tab, which contains a searchable table of all stored projects.
+And, the Changelog tab can be utilizated to track how project data managed by this tool is updated by the team over time.
+
+-->

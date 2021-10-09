@@ -18,7 +18,7 @@ class neural_network():
             self.model.add(keras.layers.Dense(units=layersizes[i], activation=activations[i-1]))
 
         # Define the optimiser
-        if optimizer=='adam': optim = keras.optimizers.Adam(learning_rate=learning_rate)
+        if optimizer=='adam': optim = keras.optimizers.Adam(lr=learning_rate)
         elif optimizer=='rmsprop': optim = keras.optimizers.RMSprop(learning_rate=learning_rate)
         else: optim = keras.optimizers.Adam(lr=learning_rate)
 
