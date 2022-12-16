@@ -58,7 +58,7 @@ for epoch in range(epochs):
         running_loss += loss.item()
 
     if epoch % 100 == 99:    # print every 100 epochs
-        print(f'[{epoch + 1}] loss: {running_loss / 2000:.3f}')
+        print(f'[{epoch + 1}] loss: {running_loss / i}')
         running_loss = 0.0
 
 print('Finished Training')
