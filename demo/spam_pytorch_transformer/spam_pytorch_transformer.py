@@ -1,7 +1,11 @@
 # Imports
-import os, torch
+import os, re, nltk, torch
+import numpy as np
+import pandas as pd
 import torch.nn as nn
-import torch.nn.functional as F
+import torch.optim as optim
+from torch.utils.data import TensorDataset, DataLoader
+from sklearn.feature_extraction.text import TfidfVectorizer
 
 class TransformerClassifier(nn.Module):
 
@@ -26,8 +30,8 @@ class TransformerClassifier(nn.Module):
         self.position_embedding = nn.Embedding(max_length, embed_size)
         self.transformer_encoder_layer = nn.TransformerEncoderLayer(embed_size, attention_heads, feedfoward_size, dropout)
         self.transformer_encoder = nn.TransformerEncoder(self.transformer_encoder_layer, num_encoders)
-        self.out = nn.Linear(embed_size, final_hidden_size)
-        self.out = nn.Softmax(final_hidden_size, num_classes)
+        self.linear = nn.Linear(embed_size, final_hidden_size)
+        self.out = nn.Softmax(num_classes)
         self.dropout = nn.Dropout(dropout)
 
     def make_mask(self, src):
@@ -36,42 +40,128 @@ class TransformerClassifier(nn.Module):
             torch.ones((src_len, src_len))
         ).expand(N, 1, src_len, src_len)
         return src_mask.to(self.device)
-
-    def make_pad_mask(self, src):
-        # (N, 1, 1, src_len)
-        src_mask = (src != self.src_pad_idx).unsqueeze(1).unsqueeze(2)
-        return src_mask.to(self.device)
         
-    def forward(self, src, mask, src_key_padding_mask):
+    def forward(self, src):
         N, seq_length = src.shape
+        mask = self.make_mask(src)
         positions = torch.arange(0, seq_length).expand(N, seq_length).to(self.device)
         embedding = self.dropout(self.word_embedding(src) + self.position_embedding(positions))
-        hidden_states = self.transformer_encoder(embedding, mask, src_key_padding_mask)
-        hidden_state = hidden_states[0]
-        avg_pool = hidden_state.mean(dim=1)
-        logits = self.fc(avg_pool)
-        return logits
+        hidden_states = self.transformer_encoder(embedding, mask)
+        output = self.out(self.linear(hidden_states))
+        return output
+
+class SpamClassifier():
+
+    def __init__(self, batch_size=1, delta=1.0, epochs=2000, lr=1e-4):
+        self.batch_size = batch_size
+        self.delta = delta
+        self.epochs = epochs
+        self.lr = lr
+        #device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.net = TransformerClassifier(2)#.to(device)
+
+    def train(self, X, Y):
+
+        dataset = TensorDataset(torch.Tensor(X), torch.Tensor(Y))
+        loader = DataLoader(dataset, batch_size=self.batch_size, shuffle=True)
+        ll = nn.HuberLoss(delta=self.delta)
+        oo = optim.Adam(self.net.parameters(), lr=self.lr)
+
+        # Train the Neural Network
+        for epoch in range(self.epochs):
+
+            running_loss = 0.0
+            for i, data in enumerate(loader, 0):
+                
+                # get the inputs; data is a list of [inputs, labels]
+                inputs, labels = data
+
+                # zero the parameter gradients
+                oo.zero_grad()
+
+                # forward + backward + optimize
+                outputs = self.net(inputs)
+                loss = ll(outputs, labels)
+                loss.backward()
+                oo.step()
+
+                # print statistics
+                running_loss += loss.item()
+
+            if epoch % 100 == 99:    # print every 100 epochs
+                print(f'[{epoch + 1}] loss: {running_loss / i}')
+                running_loss = 0.0
+
+        print('Finished Training')
+
+    # Predict from network
+    def predict_network(self, X):
+        X = torch.Tensor(X)
+        return self.net.forward(X)
+
+
+def list_files(filepath):
+    paths = []
+    for root, _, files in os.walk(filepath):
+        for file in files:
+            paths.append(os.path.join(root, file))
+    return paths
+
+def build_email_df(paths, label="spam"):
+    n = len(paths)
+    labels = n*[label]
+    texts = n*[""]
+    for idx, path in enumerate(paths):
+        try:
+            with open(path) as f:
+                texts[idx] = re.sub('\r?\n', '', ' '.join(f.readlines())).lower()
+        except:
+            texts[idx] = np.nan
+    return pd.DataFrame(
+            data=np.array([texts, labels]).T.tolist(),
+            columns=["text", "label"]
+        )
+
+import warnings
+warnings.filterwarnings('ignore')
+
+vectorizer = TfidfVectorizer()
+spam_files = list_files(".\\data\\spam")
+spam_df = build_email_df(spam_files, 1)
+ham_files = list_files(".\\data\\ham")
+ham_df = build_email_df(ham_files, 0)
+full_df = pd.concat([spam_df, ham_df])
+full_df['text'] = full_df["text"].apply(lambda x: nltk.word_tokenize(x))
+
+full_df['tokens'] = vectorizer.fit_transform(full_df['text'])
+
+len(spam_files)
+len(ham_files)
+
+class datastruct():
+
+    def __init__(self):
+        self.num_words = 0
+        self.word2index = {}
+        self.index2word = {}
+
+    def add_word(self, word):
+        if word not in self.word2index:
+            self.word2index[word] = self.num_words
+            self.index2word[self.num_words] = word
+            self.num_words += 1
+
+ds = datastruct()
+for idx in range(full_df.shape[0]):
+    text = list(full_df.loc[0, "text"])[0]
+    for word in text:
+        ds.add_word(word)
 
 
 
-src_pad_idx = 0
-trg_pad_idx = 0
-src_vocab_size = 10
-trg_vocab_size = 10
-device = "cpu"#torch.device("cuda" if torch.cuda.is_available() else "cpu")
-x = torch.tensor([[1,5,6,4,3,9,5,2,0], [1,8,7,3,4,5,6,7,2]]).to(device)
-trg = torch.tensor([[1,7,4,3,5,9,2,0], [1,5,6,2,4,7,6,2]]).to(device)
-model = Transformer(src_vocab_size, trg_vocab_size, src_pad_idx, trg_pad_idx, device).to(device)
-out = model(x, trg[:, :-1])
-print(out.shape)
+
+nltk
 
 
-# def list_files(filepath):
-#     paths = []
-#     for root, _, files in os.walk(filepath):
-#         for file in files:
-#             paths.append(os.path.join(root, file))
-#     return paths
-
-# spam_files = list_files(".\\data\\spam")
-
+model = SpamClassifier()
+model.train()
